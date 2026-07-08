@@ -19,6 +19,9 @@ export interface StoredNote {
   deleted?: boolean;
 }
 
+export type ThemeMode = "system" | "light" | "dark";
+export type AccentName = "slate" | "sage" | "clay" | "plum" | "ocean" | "graphite";
+
 export interface AppConfig {
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -27,6 +30,8 @@ export interface AppConfig {
   expiresAt?: number;
   username?: string;
   profileId?: string;
+  theme?: ThemeMode;
+  accent?: AccentName;
 }
 
 export interface SyncUser {

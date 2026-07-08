@@ -1,7 +1,10 @@
 import type { PanelAction, SharedNote, StoredNote, SyncUser, TrackMetadata } from "./models";
 import { SupabaseApi, syncPendingSaves } from "./supabaseClient";
 import { getConfig, getLocalNote, getSyncUsers, queuePendingSave, saveLocalNote } from "./storage";
+import { applyStoredTheme } from "./theme";
 import "./styles.css";
+
+applyStoredTheme();
 
 const titleEl = document.querySelector<HTMLDivElement>("#songTitle")!;
 const artistsEl = document.querySelector<HTMLDivElement>("#songArtists")!;

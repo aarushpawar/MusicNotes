@@ -1,7 +1,47 @@
 import type { SyncUser } from "./models";
 import { persistAuth, SupabaseApi } from "./supabaseClient";
 import { clearAuth, getConfig, getSyncUsers, saveConfig, saveSyncUsers } from "./storage";
+import { ACCENTS, applyStoredTheme, setTheme } from "./theme";
+import type { ThemeMode } from "./models";
 import "./styles.css";
+
+applyStoredTheme();
+
+const themeMode = document.querySelector<HTMLDivElement>("#themeMode")!;
+const accentGrid = document.querySelector<HTMLDivElement>("#accentGrid")!;
+
+const renderAppearance = async () => {
+  const config = await getConfig();
+  const mode = config.theme ?? "system";
+  const accent = config.accent ?? "slate";
+
+  themeMode.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+  });
+
+  accentGrid.innerHTML = "";
+  for (const option of ACCENTS) {
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "swatch";
+    swatch.style.setProperty("--swatch", option.color);
+    swatch.title = option.label;
+    swatch.setAttribute("aria-label", option.label);
+    swatch.setAttribute("aria-pressed", String(option.name === accent));
+    swatch.addEventListener("click", async () => {
+      await setTheme({ accent: option.name });
+      await renderAppearance();
+    });
+    accentGrid.append(swatch);
+  }
+};
+
+themeMode.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
+  button.addEventListener("click", async () => {
+    await setTheme({ theme: button.dataset.mode as ThemeMode });
+    await renderAppearance();
+  });
+});
 
 const supabaseUrl = document.querySelector<HTMLInputElement>("#supabaseUrl")!;
 const supabaseAnonKey = document.querySelector<HTMLInputElement>("#supabaseAnonKey")!;
@@ -189,4 +229,5 @@ searchButton.addEventListener("click", async () => {
   }
 });
 
+renderAppearance();
 loadOptions().catch((error: Error) => setStatus(error.message, "error"));
