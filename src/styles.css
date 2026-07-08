@@ -127,6 +127,12 @@ button:active {
   transform: translateY(0.5px);
 }
 
+button.small {
+  min-height: 0;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -391,12 +397,14 @@ input[type="checkbox"] {
   padding: 12px;
 }
 
-.note-card strong {
-  font-size: 14px;
+.note-card .head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.note-card .muted {
-  margin-top: 2px;
+.note-card strong {
+  font-size: 14px;
 }
 
 /* Shared notes are prose, not code: preserve the author's line breaks with
@@ -467,6 +475,7 @@ input[type="checkbox"] {
 
 .seg {
   display: inline-flex;
+  align-self: start; /* stay compact inside a stretch-aligned column label */
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   overflow: hidden;

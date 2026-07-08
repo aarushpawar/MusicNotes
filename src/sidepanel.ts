@@ -11,7 +11,6 @@ const artistsEl = document.querySelector<HTMLDivElement>("#songArtists")!;
 const artworkEl = document.querySelector<HTMLDivElement>("#artwork")!;
 const noteBodyEl = document.querySelector<HTMLTextAreaElement>("#noteBody")!;
 const sharedToggleEl = document.querySelector<HTMLInputElement>("#sharedToggle")!;
-const saveButton = document.querySelector<HTMLButtonElement>("#saveButton")!;
 const clearButton = document.querySelector<HTMLButtonElement>("#clearButton")!;
 const syncButton = document.querySelector<HTMLButtonElement>("#syncButton")!;
 const statusEl = document.querySelector<HTMLSpanElement>("#saveStatus")!;
@@ -57,7 +56,6 @@ const showView = (view: View) => {
 const setFormEnabled = (enabled: boolean) => {
   noteBodyEl.disabled = !enabled;
   sharedToggleEl.disabled = !enabled;
-  saveButton.disabled = !enabled;
   clearButton.disabled = !enabled;
   syncButton.disabled = !enabled;
   tabShared.disabled = !enabled;
@@ -124,7 +122,6 @@ const saveNote = async () => {
   const note = buildCurrentNote();
   if (!note || !currentTrack) return;
   await saveLocalNote(note);
-  setStatus("Saved locally");
   try {
     const api = await SupabaseApi.fromStorage();
     await api.upsertTrack(currentTrack);
@@ -135,11 +132,23 @@ const saveNote = async () => {
       await api.upsertNote(note);
     }
     await saveLocalNote({ ...note, pending: false });
-    setStatus("Synced", "ok");
+    setStatus("Saved", "ok");
   } catch (error) {
     await queuePendingSave(note);
-    setStatus(error instanceof Error ? `Saved locally: ${error.message}` : "Saved locally, sync failed", "error");
+    setStatus(error instanceof Error ? `Saved offline: ${error.message}` : "Saved offline, will sync later", "error");
   }
+};
+
+// Autosave: persist locally on every keystroke so work is never lost, then
+// debounce the remote sync. Close is always safe — nothing waits on a button.
+let syncTimer: number | undefined;
+const scheduleAutosave = () => {
+  const note = buildCurrentNote();
+  if (!note) return;
+  void saveLocalNote(note); // immediate, local, cannot fail on network
+  setStatus("Saving…");
+  if (syncTimer) window.clearTimeout(syncTimer);
+  syncTimer = window.setTimeout(() => void saveNote(), 800);
 };
 
 const clearNote = async () => {
@@ -175,10 +184,18 @@ const renderSharedNotes = (notes: SharedNote[]) => {
   for (const note of notes) {
     const item = document.createElement("article");
     item.className = "note-card";
-    item.innerHTML = `<strong>${note.username}</strong><div class="muted">${new Date(
+    item.innerHTML = `<div class="head"><strong></strong><span class="muted">${new Date(
       note.updatedAt
-    ).toLocaleString()}</div><pre></pre>`;
+    ).toLocaleString()}</span><span class="spacer"></span></div><pre></pre>`;
+    item.querySelector("strong")!.textContent = note.username;
     item.querySelector("pre")!.textContent = note.body;
+
+    const pull = document.createElement("button");
+    pull.className = "small";
+    pull.textContent = "Pull";
+    pull.addEventListener("click", () => resolveConflict(note));
+    item.querySelector(".head")!.append(pull);
+
     sharedList.append(item);
   }
 };
@@ -245,27 +262,29 @@ const resolveConflict = async (theirs: SharedNote) => {
   const mine = noteBodyEl.value.trim();
   if (!mine) {
     noteBodyEl.value = theirs.body;
+    showView("note");
     await saveNote();
-    setStatus(`Filled from ${theirs.username}`, "ok");
+    setStatus(`Pulled from ${theirs.username}`, "ok");
     return;
   }
 
-  modalTitle.textContent = "Sync conflict";
-  modalBody.textContent = `${theirs.username} has a shared note for this song. Choose how to handle it.`;
+  modalTitle.textContent = `Pull from ${theirs.username}`;
+  modalBody.textContent = "You already have a note for this song. How should theirs be added?";
   modalActions.innerHTML = "";
   modalPreview.classList.add("hidden");
   addModalButton("Keep mine", () => {
     hideModal();
-    setStatus("Kept your note");
   });
   addModalButton("Replace mine", async () => {
     noteBodyEl.value = theirs.body;
     hideModal();
+    showView("note");
     await saveNote();
   }, "primary");
   addModalButton("Add theirs to mine", async () => {
     noteBodyEl.value = await mergeNotes(mine, theirs);
     hideModal();
+    showView("note");
     await saveNote();
   });
   addModalButton("View both", () => {
@@ -314,7 +333,8 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-saveButton.addEventListener("click", () => saveNote());
+noteBodyEl.addEventListener("input", () => scheduleAutosave());
+sharedToggleEl.addEventListener("change", () => scheduleAutosave());
 clearButton.addEventListener("click", () => clearNote());
 syncButton.addEventListener("click", () => syncFromFollowed());
 tabNote.addEventListener("click", () => showView("note"));
