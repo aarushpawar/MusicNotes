@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spotify Song Notes Settings</title>
+  </head>
+  <body>
+    <main class="app" style="max-width: 760px">
+      <section class="section">
+        <h1 class="title">Settings</h1>
+        <label>
+          <span class="muted">Supabase URL</span>
+          <input id="supabaseUrl" placeholder="https://project-ref.supabase.co" />
+        </label>
+        <label>
+          <span class="muted">Supabase anon key</span>
+          <input id="supabaseAnonKey" type="password" />
+        </label>
+        <button id="saveConfig" class="primary">Save backend settings</button>
+      </section>
+
+      <section class="section">
+        <h2 class="title">Account</h2>
+        <div id="accountStatus" class="status"></div>
+        <label>
+          <span class="muted">Username</span>
+          <input id="username" autocomplete="username" />
+        </label>
+        <label>
+          <span class="muted">Password</span>
+          <input id="password" type="password" autocomplete="current-password" />
+        </label>
+        <div class="row wrap">
+          <button id="login" class="primary">Log in</button>
+          <button id="signup">Create account</button>
+          <button id="logout">Log out</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="title">Synced users</h2>
+        <div class="row">
+          <input id="userSearch" placeholder="Search username" />
+          <button id="searchButton">Search</button>
+        </div>
+        <div id="searchResults" class="list"></div>
+        <div id="syncUsers" class="list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/options.ts"></script>
+  </body>
+</html>
