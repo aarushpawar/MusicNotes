@@ -15,18 +15,19 @@
         </div>
       </section>
 
-      <section class="section">
-        <textarea id="noteBody" placeholder="Write a plain-text note for this song"></textarea>
-        <label class="row">
-          <input id="sharedToggle" type="checkbox" />
-          <span>Share this note</span>
-        </label>
-        <div class="row wrap">
-          <button id="saveButton" class="primary">Save</button>
-          <button id="clearButton">Clear</button>
-          <button id="sharedButton">Shared</button>
-          <button id="syncButton">Sync</button>
-          <span class="spacer"></span>
+      <section class="section editor">
+        <textarea id="noteBody" placeholder="Write a note for this song…"></textarea>
+        <div class="editor-footer">
+          <label class="row toggle">
+            <input id="sharedToggle" type="checkbox" />
+            <span>Share this note</span>
+          </label>
+          <div class="row wrap actions">
+            <button id="saveButton" class="primary">Save</button>
+            <button id="clearButton">Clear</button>
+            <button id="sharedButton">Shared</button>
+            <button id="syncButton">Sync</button>
+          </div>
           <span id="saveStatus" class="status"></span>
         </div>
       </section>

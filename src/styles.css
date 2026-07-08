@@ -190,17 +190,17 @@ select:focus {
 }
 
 textarea {
-  min-height: 220px;
+  min-height: 120px;
   resize: vertical;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .app {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-height: 100vh;
-  padding: 14px;
+  padding: 16px;
 }
 
 .row {
@@ -233,7 +233,14 @@ h1 {
 h2 {
   font-size: 15px;
   font-weight: 600;
-  margin: 0;
+  margin: 0 0 2px;
+}
+
+/* Labels stack their caption above the control with a small gap. */
+label:not(.row) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .song {
@@ -279,7 +286,44 @@ h2 {
 .section {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+/* The note editor is the hero: its textarea grows to fill the panel so long,
+   detailed notes get all the vertical room, with the actions pinned below. */
+.editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.editor > textarea {
+  flex: 1;
+  min-height: 120px;
+}
+
+.editor-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toggle {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.actions {
   gap: 8px;
+}
+
+.actions button {
+  flex: 1;
+  min-width: fit-content;
+}
+
+/* Save carries the most weight. */
+.actions #saveButton {
+  flex: 1.4;
 }
 
 .status {
@@ -313,14 +357,26 @@ input[type="checkbox"] {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: 12px;
 }
 
+.note-card strong {
+  font-size: 14px;
+}
+
+.note-card .muted {
+  margin-top: 2px;
+}
+
+/* Shared notes are prose, not code: preserve the author's line breaks with
+   pre-wrap but render in the reading font, not monospace. */
 .note-card pre {
-  margin: 8px 0 0;
+  font-family: inherit;
+  font-size: 14px;
+  margin: 10px 0 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .hidden {
