@@ -7,36 +7,40 @@
   </head>
   <body>
     <main class="app">
-      <section class="song">
+      <header class="song">
         <div id="artwork" class="artwork">No art</div>
-        <div>
+        <div class="song-meta">
           <div id="songTitle" class="title">Song not detected</div>
           <div id="songArtists" class="artists">Open Spotify Web Player and start playback.</div>
         </div>
-      </section>
+      </header>
 
-      <section class="section editor">
+      <nav id="viewNav" class="seg" role="tablist" aria-label="View">
+        <button id="tabNote" role="tab" aria-selected="true" aria-controls="editorView">My note</button>
+        <button id="tabShared" role="tab" aria-selected="false" aria-controls="sharedView">Shared</button>
+      </nav>
+
+      <section id="editorView" class="view editor" role="tabpanel">
         <textarea id="noteBody" placeholder="Write a note for this song…"></textarea>
         <div class="editor-footer">
           <label class="row toggle">
             <input id="sharedToggle" type="checkbox" />
             <span>Share this note</span>
           </label>
-          <div class="row wrap actions">
+          <div class="row actions">
             <button id="saveButton" class="primary">Save</button>
             <button id="clearButton">Clear</button>
-            <button id="sharedButton">Shared</button>
-            <button id="syncButton">Sync</button>
+            <span class="spacer"></span>
+            <span id="saveStatus" class="status"></span>
           </div>
-          <span id="saveStatus" class="status"></span>
         </div>
       </section>
 
-      <section id="sharedSection" class="section hidden">
+      <section id="sharedView" class="view hidden" role="tabpanel" aria-hidden="true">
         <div class="row">
-          <h2>Shared notes</h2>
+          <button id="syncButton">Pull into my note</button>
           <span class="spacer"></span>
-          <button id="closeShared">Close</button>
+          <span id="sharedStatus" class="status"></span>
         </div>
         <div id="sharedList" class="list"></div>
       </section>

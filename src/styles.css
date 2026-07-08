@@ -198,9 +198,15 @@ textarea {
 .app {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 100vh;
+  gap: 14px;
+  height: 100dvh;
   padding: 16px;
+}
+
+/* Options is a normal scrolling page, not a fixed-height panel. */
+.app.page {
+  height: auto;
+  min-height: 100dvh;
 }
 
 .row {
@@ -289,13 +295,18 @@ label:not(.row) {
   gap: 10px;
 }
 
-/* The note editor is the hero: its textarea grows to fill the panel so long,
-   detailed notes get all the vertical room, with the actions pinned below. */
-.editor {
+/* A view is one tab panel. It fills the space between the header/nav and the
+   bottom of the panel; the shared list scrolls internally if it overflows. */
+.view {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 10px;
   min-height: 0;
 }
 
+/* The note editor is the hero: the textarea grows to fill the view so long,
+   detailed notes get all the vertical room, with the actions pinned below. */
 .editor > textarea {
   flex: 1;
   min-height: 120px;
@@ -307,6 +318,11 @@ label:not(.row) {
   gap: 10px;
 }
 
+#sharedView .list {
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .toggle {
   font-size: 13px;
   color: var(--ink-2);
@@ -316,14 +332,29 @@ label:not(.row) {
   gap: 8px;
 }
 
-.actions button {
-  flex: 1;
-  min-width: fit-content;
+/* Nav tab bar spans the panel; reuses the .seg segmented-control vocabulary. */
+#viewNav {
+  width: 100%;
 }
 
-/* Save carries the most weight. */
-.actions #saveButton {
-  flex: 1.4;
+#viewNav button {
+  flex: 1;
+}
+
+#viewNav button[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.song-meta {
+  min-width: 0;
+}
+
+.song-meta .title,
+.song-meta .artists {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status {

@@ -13,12 +13,14 @@ const noteBodyEl = document.querySelector<HTMLTextAreaElement>("#noteBody")!;
 const sharedToggleEl = document.querySelector<HTMLInputElement>("#sharedToggle")!;
 const saveButton = document.querySelector<HTMLButtonElement>("#saveButton")!;
 const clearButton = document.querySelector<HTMLButtonElement>("#clearButton")!;
-const sharedButton = document.querySelector<HTMLButtonElement>("#sharedButton")!;
 const syncButton = document.querySelector<HTMLButtonElement>("#syncButton")!;
 const statusEl = document.querySelector<HTMLSpanElement>("#saveStatus")!;
-const sharedSection = document.querySelector<HTMLElement>("#sharedSection")!;
+const sharedStatusEl = document.querySelector<HTMLSpanElement>("#sharedStatus")!;
+const tabNote = document.querySelector<HTMLButtonElement>("#tabNote")!;
+const tabShared = document.querySelector<HTMLButtonElement>("#tabShared")!;
+const editorView = document.querySelector<HTMLElement>("#editorView")!;
+const sharedView = document.querySelector<HTMLElement>("#sharedView")!;
 const sharedList = document.querySelector<HTMLDivElement>("#sharedList")!;
-const closeShared = document.querySelector<HTMLButtonElement>("#closeShared")!;
 const modalBackdrop = document.querySelector<HTMLDivElement>("#modalBackdrop")!;
 const modalTitle = document.querySelector<HTMLDivElement>("#modalTitle")!;
 const modalBody = document.querySelector<HTMLParagraphElement>("#modalBody")!;
@@ -34,13 +36,31 @@ const setStatus = (message: string, kind: "ok" | "error" | "" = "") => {
   statusEl.className = `status ${kind}`.trim();
 };
 
+const setSharedStatus = (message: string, kind: "ok" | "error" | "" = "") => {
+  sharedStatusEl.textContent = message;
+  sharedStatusEl.className = `status ${kind}`.trim();
+};
+
+type View = "note" | "shared";
+
+const showView = (view: View) => {
+  const shared = view === "shared";
+  editorView.classList.toggle("hidden", shared);
+  sharedView.classList.toggle("hidden", !shared);
+  sharedView.setAttribute("aria-hidden", String(!shared));
+  editorView.setAttribute("aria-hidden", String(shared));
+  tabNote.setAttribute("aria-selected", String(!shared));
+  tabShared.setAttribute("aria-selected", String(shared));
+  if (shared) void showSharedNotes();
+};
+
 const setFormEnabled = (enabled: boolean) => {
   noteBodyEl.disabled = !enabled;
   sharedToggleEl.disabled = !enabled;
   saveButton.disabled = !enabled;
   clearButton.disabled = !enabled;
-  sharedButton.disabled = !enabled;
   syncButton.disabled = !enabled;
+  tabShared.disabled = !enabled;
 };
 
 const renderTrack = (track?: TrackMetadata) => {
@@ -165,13 +185,14 @@ const renderSharedNotes = (notes: SharedNote[]) => {
 
 const showSharedNotes = async () => {
   if (!currentTrack) return;
-  sharedSection.classList.remove("hidden");
-  sharedList.innerHTML = '<div class="muted">Loading shared notes...</div>';
+  setSharedStatus("");
+  sharedList.innerHTML = '<div class="muted">Loading shared notes…</div>';
   try {
     const api = await SupabaseApi.fromStorage();
     renderSharedNotes(await api.fetchSharedNotes(currentTrack.spotifyTrackId));
   } catch (error) {
-    sharedList.innerHTML = `<div class="status error">${error instanceof Error ? error.message : "Could not load notes"}</div>`;
+    sharedList.innerHTML = "";
+    setSharedStatus(error instanceof Error ? error.message : "Could not load notes", "error");
   }
 };
 
@@ -263,12 +284,13 @@ const syncFromFollowed = async () => {
     const matches = notes.filter((note) => followedIds.has(note.profileId));
     const chosen = await chooseSharedNote(matches, syncUsers);
     if (!chosen) {
-      setStatus("No followed-user note found");
+      setSharedStatus("No followed-user note for this song");
       return;
     }
     await resolveConflict(chosen);
+    showView("note");
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : "Sync failed", "error");
+    setSharedStatus(error instanceof Error ? error.message : "Sync failed", "error");
   }
 };
 
@@ -277,8 +299,12 @@ const refreshPanelState = async () => {
   currentAction = response.action ?? "edit";
   renderTrack(response.track);
   await loadNote();
-  if (currentAction === "shared") await showSharedNotes();
-  if (currentAction === "sync") await syncFromFollowed();
+  // The launch action only picks the initial view; navigation lives in the panel.
+  if (currentAction === "shared") showView("shared");
+  else if (currentAction === "sync") {
+    showView("shared");
+    await syncFromFollowed();
+  }
 };
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -290,9 +316,9 @@ chrome.runtime.onMessage.addListener((message) => {
 
 saveButton.addEventListener("click", () => saveNote());
 clearButton.addEventListener("click", () => clearNote());
-sharedButton.addEventListener("click", () => showSharedNotes());
 syncButton.addEventListener("click", () => syncFromFollowed());
-closeShared.addEventListener("click", () => sharedSection.classList.add("hidden"));
+tabNote.addEventListener("click", () => showView("note"));
+tabShared.addEventListener("click", () => showView("shared"));
 
 getConfig().then((config) => {
   if (!config.username) setStatus("Sign in from Options to sync notes.");
