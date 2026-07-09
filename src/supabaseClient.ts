@@ -1,5 +1,7 @@
-import type { AppConfig, SharedNote, StoredNote, SyncUser, TrackMetadata } from "./models";
-import { getConfig, getPendingSaves, removePendingSave, saveConfig, saveLocalNote } from "./storage";
+import type { AppConfig, ForumNote, SharedNote, StoredNote, SyncUser, TrackMetadata } from "./models";
+
+const FORUM_PAGE_SIZE = 30;
+import { clearAuth, getConfig, getPendingSaves, removePendingSave, saveConfig, saveLocalNote } from "./storage";
 
 interface AuthResponse {
   access_token: string;
@@ -36,7 +38,7 @@ export class SupabaseApi {
   }
 
   static async fromStorage(): Promise<SupabaseApi> {
-    return new SupabaseApi(await getConfig());
+    return new SupabaseApi(await ensureFreshToken(await getConfig()));
   }
 
   private headers(authenticated = true): HeadersInit {
@@ -159,6 +161,55 @@ export class SupabaseApi {
       }));
   }
 
+  // Notes across every track, newest first, for the forum / my-notes lists. Keyset
+  // paginated on updated_at: pass the last row's updatedAt as `cursor` for the next page.
+  // Without `ownerId` returns all shared notes (the public forum); with it, returns that
+  // user's own notes (shared or not — RLS lets you read your own private notes).
+  // ponytail: keyset on updated_at, add id as tiebreaker only if dup timestamps appear
+  async fetchForumNotes(cursor?: string, ownerId?: string): Promise<{ notes: ForumNote[]; nextCursor?: string }> {
+    const before = cursor ? `&updated_at=lt.${encodeURIComponent(cursor)}` : "";
+    const scope = ownerId ? `&user_id=eq.${encodeURIComponent(ownerId)}` : "&shared=eq.true";
+    const rows = await this.request<
+      Array<{
+        id: string;
+        user_id: string;
+        track_id: string;
+        body: string;
+        shared: boolean;
+        updated_at: string;
+        profiles: { username: string } | null;
+        tracks: {
+          spotify_url: string;
+          title: string;
+          artists: string[];
+          album: string | null;
+          artwork_url: string | null;
+        } | null;
+      }>
+    >(
+      `/rest/v1/notes?select=id,user_id,track_id,body,shared,updated_at,profiles(username),tracks(spotify_url,title,artists,album,artwork_url)${scope}&order=updated_at.desc&limit=${FORUM_PAGE_SIZE}${before}`
+    );
+    const notes = rows
+      .filter((row) => row.tracks)
+      .map((row) => ({
+        noteId: row.id,
+        profileId: row.user_id,
+        trackId: row.track_id,
+        username: row.profiles?.username ?? "unknown",
+        body: row.body,
+        shared: row.shared,
+        updatedAt: row.updated_at,
+        spotifyUrl: row.tracks!.spotify_url,
+        title: row.tracks!.title,
+        artists: row.tracks!.artists,
+        album: row.tracks!.album ?? undefined,
+        artworkUrl: row.tracks!.artwork_url ?? undefined
+      }));
+    // A full page means there may be more; cursor is the last row's timestamp.
+    const nextCursor = rows.length === FORUM_PAGE_SIZE ? rows[rows.length - 1].updated_at : undefined;
+    return { notes, nextCursor };
+  }
+
   // Verify the old password by re-authenticating, then set the new one. Supabase
   // has no native "confirm current password" step, so the login is our check.
   async changePassword(username: string, oldPassword: string, newPassword: string): Promise<void> {
@@ -227,6 +278,43 @@ export class SupabaseApi {
     );
   }
 }
+
+// Access tokens live ~1h; the refresh token (default ~30d, sliding) buys the token back
+// silently so users who return days later stay signed in. We never store the password.
+const REFRESH_SKEW_MS = 60_000; // refresh a minute early so an in-flight call can't expire
+let refreshInFlight: Promise<AppConfig> | undefined;
+
+export const ensureFreshToken = async (config: AppConfig): Promise<AppConfig> => {
+  if (!config.accessToken || !config.refreshToken) return config; // signed out
+  if (config.expiresAt && config.expiresAt - Date.now() > REFRESH_SKEW_MS) return config;
+  // Dedupe: a panel load fires many API calls at once; they share one refresh.
+  if (!refreshInFlight) refreshInFlight = doRefresh(config).finally(() => (refreshInFlight = undefined));
+  return refreshInFlight;
+};
+
+const doRefresh = async (config: AppConfig): Promise<AppConfig> => {
+  const url = normalizeUrl(config.supabaseUrl!);
+  const response = await fetch(`${url}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: { apikey: config.supabaseAnonKey!, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: config.refreshToken })
+  });
+  if (!response.ok) {
+    // Refresh token itself is dead/revoked — clear auth so the UI prompts a fresh sign-in.
+    await clearAuth();
+    throw new Error("Session expired. Please sign in again from Options.");
+  }
+  const body = (await response.json()) as { access_token: string; refresh_token: string; expires_in: number };
+  // Keep profileId/username — the refresh endpoint doesn't return our custom profile fields.
+  const next: AppConfig = {
+    ...config,
+    accessToken: body.access_token,
+    refreshToken: body.refresh_token,
+    expiresAt: Date.now() + body.expires_in * 1000
+  };
+  await saveConfig(next);
+  return next;
+};
 
 export const persistAuth = async (auth: AuthResponse): Promise<void> => {
   const config = await getConfig();

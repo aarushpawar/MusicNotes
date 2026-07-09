@@ -13,6 +13,10 @@
           <div id="songTitle" class="title">Song not detected</div>
           <div id="songArtists" class="artists">Open Spotify Web Player and start playback.</div>
         </div>
+        <div class="row header-actions">
+          <button id="forumButton" class="small" aria-pressed="false">Forum</button>
+          <button id="myNotesButton" class="small" aria-pressed="false">My Notes</button>
+        </div>
       </header>
 
       <nav id="viewNav" class="seg" role="tablist" aria-label="View">
@@ -42,6 +46,18 @@
           <span id="sharedStatus" class="status"></span>
         </div>
         <div id="sharedList" class="list"></div>
+      </section>
+
+      <section id="forumView" class="view hidden" role="tabpanel" aria-hidden="true">
+        <div class="row">
+          <strong id="forumTitle">Forum</strong>
+          <span id="forumSubtitle" class="muted">Shared notes from everyone</span>
+          <span class="spacer"></span>
+          <span id="forumStatus" class="status"></span>
+        </div>
+        <div id="forumList" class="list">
+          <div id="forumSentinel"></div>
+        </div>
       </section>
     </main>
 
