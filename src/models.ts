@@ -49,6 +49,22 @@ export interface SharedNote {
   updatedAt: string;
 }
 
+export interface ForumNote {
+  noteId: string;
+  profileId: string;
+  trackId: string;
+  username: string;
+  body: string;
+  shared: boolean;
+  updatedAt: string;
+  // Embedded track — a card shows the song and links to it.
+  spotifyUrl: string;
+  title: string;
+  artists: string[];
+  album?: string;
+  artworkUrl?: string;
+}
+
 export interface PanelState {
   action?: PanelAction;
   track?: TrackMetadata;
