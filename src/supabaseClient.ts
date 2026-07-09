@@ -1,7 +1,7 @@
 import type { AppConfig, ForumNote, SharedNote, StoredNote, SyncUser, TrackMetadata } from "./models";
+import { clearAuth, getConfig, getPendingSaves, removePendingSave, saveConfig, saveLocalNote } from "./storage";
 
 const FORUM_PAGE_SIZE = 30;
-import { clearAuth, getConfig, getPendingSaves, removePendingSave, saveConfig, saveLocalNote } from "./storage";
 
 interface AuthResponse {
   access_token: string;
