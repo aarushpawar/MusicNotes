@@ -52,6 +52,11 @@ const passwordInput = document.querySelector<HTMLInputElement>("#password")!;
 const loginButton = document.querySelector<HTMLButtonElement>("#login")!;
 const signupButton = document.querySelector<HTMLButtonElement>("#signup")!;
 const logoutButton = document.querySelector<HTMLButtonElement>("#logout")!;
+const changePasswordSection = document.querySelector<HTMLElement>("#changePasswordSection")!;
+const oldPassword = document.querySelector<HTMLInputElement>("#oldPassword")!;
+const newPassword = document.querySelector<HTMLInputElement>("#newPassword")!;
+const changePasswordButton = document.querySelector<HTMLButtonElement>("#changePassword")!;
+const passwordStatus = document.querySelector<HTMLSpanElement>("#passwordStatus")!;
 const userSearch = document.querySelector<HTMLInputElement>("#userSearch")!;
 const searchButton = document.querySelector<HTMLButtonElement>("#searchButton")!;
 const searchResults = document.querySelector<HTMLDivElement>("#searchResults")!;
@@ -161,6 +166,8 @@ const loadOptions = async () => {
   supabaseUrl.value = config.supabaseUrl ?? "";
   supabaseAnonKey.value = config.supabaseAnonKey ?? "";
   usernameInput.value = config.username ?? "";
+  const loggedIn = Boolean(config.username && config.accessToken);
+  changePasswordSection.classList.toggle("hidden", !loggedIn);
   setStatus(config.username ? `Signed in as ${config.username}` : "Not signed in", config.username ? "ok" : "");
   await renderSyncUsers();
   try {
@@ -215,6 +222,28 @@ logoutButton.addEventListener("click", async () => {
   await clearAuth();
   setStatus("Logged out");
   await loadOptions();
+});
+
+changePasswordButton.addEventListener("click", async () => {
+  const config = await getConfig();
+  if (!config.username) {
+    passwordStatus.textContent = "Sign in first.";
+    passwordStatus.className = "status error";
+    return;
+  }
+  passwordStatus.textContent = "Updating…";
+  passwordStatus.className = "status";
+  try {
+    const api = await SupabaseApi.fromStorage();
+    await api.changePassword(config.username, oldPassword.value, newPassword.value);
+    oldPassword.value = "";
+    newPassword.value = "";
+    passwordStatus.textContent = "Password updated";
+    passwordStatus.className = "status ok";
+  } catch (error) {
+    passwordStatus.textContent = error instanceof Error ? error.message : "Update failed";
+    passwordStatus.className = "status error";
+  }
 });
 
 searchButton.addEventListener("click", async () => {

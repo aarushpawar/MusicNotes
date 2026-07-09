@@ -1,6 +1,14 @@
 import type { AppConfig, StoredNote, SyncUser, TrackMetadata } from "./models";
 
 const CONFIG_KEY = "appConfig";
+
+// Ship a working backend by default so notes sync out of the box. The anon key
+// is public by design (row-level security is the real gate); Options overrides both.
+const DEFAULT_BACKEND = {
+  supabaseUrl: "https://yktzaqevmempzxgsqcqy.supabase.co",
+  supabaseAnonKey:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrdHphcWV2bWVtcHp4Z3NxY3F5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MjAwODUsImV4cCI6MjA5OTA5NjA4NX0.hnXe1vtiExG6RSXlSJA--FSFLnPyqaRx_Z9Ad8ehmXk"
+};
 const CURRENT_TRACK_KEY = "currentTrack";
 const NOTES_KEY = "notesByTrack";
 const SYNC_USERS_KEY = "syncUsers";
@@ -16,7 +24,7 @@ const setStorage = async (items: Record<string, unknown>): Promise<void> => {
 
 export const getConfig = async (): Promise<AppConfig> => {
   const result = await getStorage<Record<typeof CONFIG_KEY, AppConfig | undefined>>(CONFIG_KEY);
-  return result[CONFIG_KEY] ?? {};
+  return { ...DEFAULT_BACKEND, ...result[CONFIG_KEY] };
 };
 
 export const saveConfig = async (config: AppConfig): Promise<void> => {

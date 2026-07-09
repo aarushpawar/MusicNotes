@@ -11,7 +11,8 @@ export default defineConfig({
         background: resolve(__dirname, "src/background.ts"),
         content: resolve(__dirname, "src/content.ts"),
         sidepanel: resolve(__dirname, "sidepanel.html"),
-        options: resolve(__dirname, "options.html")
+        options: resolve(__dirname, "options.html"),
+        popup: resolve(__dirname, "popup.html")
       },
       output: {
         entryFileNames: "assets/[name].js",
