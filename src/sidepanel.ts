@@ -1,4 +1,4 @@
-import type { ForumNote, PanelAction, SharedNote, StoredNote, SyncUser, TrackMetadata } from "./models";
+import type { ForumNote, SharedNote, StoredNote, SyncUser, TrackMetadata } from "./models";
 import { SupabaseApi, syncPendingSaves } from "./supabaseClient";
 import { getConfig, getLocalNote, getSyncUsers, queuePendingSave, saveLocalNote } from "./storage";
 import { applyStoredTheme } from "./theme";
@@ -37,7 +37,6 @@ const modalPreviewPre = modalPreview.querySelector("pre")!;
 const modalActions = document.querySelector<HTMLDivElement>("#modalActions")!;
 
 let currentTrack: TrackMetadata | undefined;
-let currentAction: PanelAction = "edit";
 
 const setStatus = (message: string, kind: "ok" | "error" | "" = "") => {
   statusEl.textContent = message;
@@ -483,7 +482,7 @@ const showForum = async (mode: ForumMode) => {
     return;
   }
   // Page 1 didn't fill the viewport but more pages exist: keep loading.
-  if (requestId === forumRequestId && forumCursor && sentinelInView()) void loadMoreForum();
+  if (forumCursor && sentinelInView()) void loadMoreForum();
 };
 
 const loadMoreForum = async () => {
@@ -510,7 +509,7 @@ const loadMoreForum = async () => {
     forumLoading = false;
   }
   // Still more pages and the sentinel is still in view: continue the fill chain.
-  if (requestId === forumRequestId && forumCursor && sentinelInView()) void loadMoreForum();
+  if (forumCursor && sentinelInView()) void loadMoreForum();
 };
 
 // Auto-load the next page when the sentinel scrolls into the forum list's viewport.
@@ -624,15 +623,8 @@ const syncFromFollowed = async () => {
 
 const refreshPanelState = async () => {
   const response = await chrome.runtime.sendMessage({ type: "GET_PANEL_STATE" });
-  currentAction = response.action ?? "edit";
   renderTrack(response.track);
   await loadNote();
-  // The launch action only picks the initial view; navigation lives in the panel.
-  if (currentAction === "shared") showView("shared");
-  else if (currentAction === "sync") {
-    showView("shared");
-    await syncFromFollowed();
-  }
 };
 
 chrome.runtime.onMessage.addListener((message) => {

@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResp
 
   if (message.type === "GET_PANEL_STATE") {
     getCurrentTrack()
-      .then((storedTrack) => sendResponse({ action: "edit", track: inMemoryTrack ?? storedTrack }))
+      .then((storedTrack) => sendResponse({ track: inMemoryTrack ?? storedTrack }))
       .catch((error: Error) => sendResponse({ error: error.message }));
     return true;
   }
