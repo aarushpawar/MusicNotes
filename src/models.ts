@@ -1,5 +1,3 @@
-export type PanelAction = "edit" | "shared" | "sync";
-
 export interface TrackMetadata {
   spotifyTrackId: string;
   spotifyUrl: string;
@@ -65,17 +63,9 @@ export interface ForumNote {
   artworkUrl?: string;
 }
 
-export interface PanelState {
-  action?: PanelAction;
-  track?: TrackMetadata;
-}
-
 export type RuntimeMessage =
   | { type: "TRACK_CHANGED"; track?: TrackMetadata }
-  | { type: "GET_CURRENT_TRACK" }
-  | { type: "GET_PANEL_STATE" }
-  | { type: "PANEL_ACTION"; action: PanelAction }
-  | { type: "OPEN_PANEL"; action: PanelAction };
+  | { type: "GET_PANEL_STATE" };
 
 export const isSpotifyTrack = (value: unknown): value is TrackMetadata => {
   if (!value || typeof value !== "object") return false;

@@ -1,18 +1,16 @@
 {
   "name": "spotify-song-notes-extension",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "clean": "rimraf dist",
     "package": "npm run build && node scripts/package.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "@types/node": "^20.14.15",
-    "rimraf": "^5.0.7",
     "typescript": "^5.5.4",
     "vite": "^5.4.2"
   }

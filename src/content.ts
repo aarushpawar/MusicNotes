@@ -15,23 +15,6 @@ const slugify = (parts: string[]) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-const patchHistory = () => {
-  const notify = () => window.dispatchEvent(new Event("spotify-song-notes:navigation"));
-  const originalPushState = history.pushState;
-  const originalReplaceState = history.replaceState;
-  history.pushState = function pushState(...args) {
-    const result = originalPushState.apply(this, args);
-    notify();
-    return result;
-  };
-  history.replaceState = function replaceState(...args) {
-    const result = originalReplaceState.apply(this, args);
-    notify();
-    return result;
-  };
-  window.addEventListener("popstate", notify);
-};
-
 const cleanText = (value: string | null | undefined) => value?.replace(/\s+/g, " ").trim() ?? "";
 
 // The currently-playing track lives in the now playing bar at the bottom left.
@@ -88,10 +71,6 @@ const scheduleDetection = () => {
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === "GET_CURRENT_TRACK") {
-    sendResponse({ track: detectTrack() });
-    return true;
-  }
   if (message?.type === "TOGGLE_OVERLAY") {
     toggleOverlay();
     sendResponse({ ok: true });
@@ -100,7 +79,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-patchHistory();
 new MutationObserver(scheduleDetection).observe(document.body, {
   childList: true,
   subtree: true,
@@ -108,7 +86,6 @@ new MutationObserver(scheduleDetection).observe(document.body, {
   attributes: true,
   attributeFilter: ["href", "src", "aria-label", "title"]
 });
-window.addEventListener("spotify-song-notes:navigation", scheduleDetection);
 window.setInterval(scheduleDetection, 5000);
 scheduleDetection();
 void initOverlay();

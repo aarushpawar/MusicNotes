@@ -14,21 +14,13 @@ const NOTES_KEY = "notesByTrack";
 const SYNC_USERS_KEY = "syncUsers";
 const PENDING_SAVES_KEY = "pendingSaves";
 
-const getStorage = async <T>(keys: string | string[] | Record<string, unknown>): Promise<T> => {
-  return chrome.storage.local.get(keys) as Promise<T>;
-};
-
-const setStorage = async (items: Record<string, unknown>): Promise<void> => {
-  await chrome.storage.local.set(items);
-};
-
 export const getConfig = async (): Promise<AppConfig> => {
-  const result = await getStorage<Record<typeof CONFIG_KEY, AppConfig | undefined>>(CONFIG_KEY);
+  const result = (await chrome.storage.local.get(CONFIG_KEY)) as Record<typeof CONFIG_KEY, AppConfig | undefined>;
   return { ...DEFAULT_BACKEND, ...result[CONFIG_KEY] };
 };
 
 export const saveConfig = async (config: AppConfig): Promise<void> => {
-  await setStorage({ [CONFIG_KEY]: config });
+  await chrome.storage.local.set({ [CONFIG_KEY]: config });
 };
 
 export const clearAuth = async (): Promise<void> => {
@@ -42,16 +34,16 @@ export const clearAuth = async (): Promise<void> => {
 };
 
 export const getCurrentTrack = async (): Promise<TrackMetadata | undefined> => {
-  const result = await getStorage<Record<typeof CURRENT_TRACK_KEY, TrackMetadata | undefined>>(CURRENT_TRACK_KEY);
+  const result = (await chrome.storage.local.get(CURRENT_TRACK_KEY)) as Record<typeof CURRENT_TRACK_KEY, TrackMetadata | undefined>;
   return result[CURRENT_TRACK_KEY];
 };
 
 export const saveCurrentTrack = async (track?: TrackMetadata): Promise<void> => {
-  await setStorage({ [CURRENT_TRACK_KEY]: track });
+  await chrome.storage.local.set({ [CURRENT_TRACK_KEY]: track });
 };
 
 export const getAllNotes = async (): Promise<Record<string, StoredNote>> => {
-  const result = await getStorage<Record<typeof NOTES_KEY, Record<string, StoredNote> | undefined>>(NOTES_KEY);
+  const result = (await chrome.storage.local.get(NOTES_KEY)) as Record<typeof NOTES_KEY, Record<string, StoredNote> | undefined>;
   return result[NOTES_KEY] ?? {};
 };
 
@@ -67,32 +59,32 @@ export const saveLocalNote = async (note: StoredNote): Promise<void> => {
   } else {
     notes[note.trackId] = note;
   }
-  await setStorage({ [NOTES_KEY]: notes });
+  await chrome.storage.local.set({ [NOTES_KEY]: notes });
 };
 
 export const getPendingSaves = async (): Promise<StoredNote[]> => {
-  const result = await getStorage<Record<typeof PENDING_SAVES_KEY, StoredNote[] | undefined>>(PENDING_SAVES_KEY);
+  const result = (await chrome.storage.local.get(PENDING_SAVES_KEY)) as Record<typeof PENDING_SAVES_KEY, StoredNote[] | undefined>;
   return result[PENDING_SAVES_KEY] ?? [];
 };
 
 export const queuePendingSave = async (note: StoredNote): Promise<void> => {
   const pending = await getPendingSaves();
   const withoutTrack = pending.filter((item) => item.trackId !== note.trackId);
-  await setStorage({ [PENDING_SAVES_KEY]: [...withoutTrack, { ...note, pending: true }] });
+  await chrome.storage.local.set({ [PENDING_SAVES_KEY]: [...withoutTrack, { ...note, pending: true }] });
 };
 
 export const removePendingSave = async (trackId: string): Promise<void> => {
   const pending = await getPendingSaves();
-  await setStorage({ [PENDING_SAVES_KEY]: pending.filter((item) => item.trackId !== trackId) });
+  await chrome.storage.local.set({ [PENDING_SAVES_KEY]: pending.filter((item) => item.trackId !== trackId) });
 };
 
 export const getSyncUsers = async (): Promise<SyncUser[]> => {
-  const result = await getStorage<Record<typeof SYNC_USERS_KEY, SyncUser[] | undefined>>(SYNC_USERS_KEY);
+  const result = (await chrome.storage.local.get(SYNC_USERS_KEY)) as Record<typeof SYNC_USERS_KEY, SyncUser[] | undefined>;
   return (result[SYNC_USERS_KEY] ?? []).sort((a, b) => a.priority - b.priority);
 };
 
 export const saveSyncUsers = async (users: SyncUser[]): Promise<void> => {
-  await setStorage({
+  await chrome.storage.local.set({
     [SYNC_USERS_KEY]: users.map((user, index) => ({ ...user, priority: index }))
   });
 };

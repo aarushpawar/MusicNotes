@@ -35,7 +35,7 @@ const fetchLatest = async (): Promise<ReleaseInfo | undefined> => {
 };
 
 // True when the latest release is newer than what's installed.
-export const isUpdateAvailable = (latest: ReleaseInfo | undefined): boolean => {
+const isUpdateAvailable = (latest: ReleaseInfo | undefined): boolean => {
   if (!latest) return false;
   const current = normalize(chrome.runtime.getManifest().version);
   return compareVersions(latest.version, current) > 0;
