@@ -59,7 +59,14 @@ export class SupabaseApi {
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(text || `Supabase request failed with ${response.status}`);
+      let message = text;
+      try {
+        const body = JSON.parse(text);
+        message = body.error ?? body.message ?? body.msg ?? text;
+      } catch {
+        // not JSON, use raw text
+      }
+      throw new Error(message || `Supabase request failed with ${response.status}`);
     }
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
@@ -150,6 +157,26 @@ export class SupabaseApi {
         body: row.body,
         updatedAt: row.updated_at
       }));
+  }
+
+  // Verify the old password by re-authenticating, then set the new one. Supabase
+  // has no native "confirm current password" step, so the login is our check.
+  async changePassword(username: string, oldPassword: string, newPassword: string): Promise<void> {
+    if (newPassword.length < 8) throw new Error("New password must be at least 8 characters.");
+    const auth = await this.login(username, oldPassword);
+    const response = await fetch(`${this.url}/auth/v1/user`, {
+      method: "PUT",
+      headers: {
+        apikey: this.anonKey,
+        Authorization: `Bearer ${auth.access_token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ password: newPassword })
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Password update failed with ${response.status}`);
+    }
   }
 
   async deleteMyNote(trackId: string): Promise<void> {

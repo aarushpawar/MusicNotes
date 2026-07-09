@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Spotify Song Notes",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Plain-text notes for Spotify Web Player songs, with optional shared-note sync.",
   "action": {
-    "default_title": "Spotify Song Notes"
+    "default_title": "Spotify Song Notes",
+    "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "assets/background.js",
@@ -21,9 +22,15 @@
     "default_path": "sidepanel.html"
   },
   "options_page": "options.html",
-  "permissions": ["activeTab", "contextMenus", "sidePanel", "storage", "tabs"],
-  "host_permissions": ["https://open.spotify.com/*", "https://*.supabase.co/*"],
+  "permissions": ["activeTab", "sidePanel", "storage", "tabs"],
+  "host_permissions": ["https://open.spotify.com/*", "https://*.supabase.co/*", "https://api.github.com/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["sidepanel.html", "assets/*"],
+      "matches": ["https://open.spotify.com/*"]
+    }
+  ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://*.supabase.co"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://*.supabase.co https://api.github.com"
   }
 }

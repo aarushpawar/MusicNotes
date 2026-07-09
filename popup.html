@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spotify Song Notes</title>
+  </head>
+  <body>
+    <main class="app page" style="width: 300px; padding: 14px; gap: 12px">
+      <header class="section">
+        <h1>Song Notes</h1>
+      </header>
+
+      <!-- Shown only when a newer GitHub release exists. -->
+      <a id="updateBanner" class="status ok hidden" target="_blank" rel="noopener"></a>
+
+      <!-- Account: one of these two blocks shows depending on login state. -->
+      <section class="section" id="account">
+        <div id="signedIn" class="section hidden">
+          <div class="muted">Logged in as</div>
+          <div class="row">
+            <strong id="whoami"></strong>
+            <span class="spacer"></span>
+            <button id="logout" class="small">Log out</button>
+          </div>
+        </div>
+
+        <div id="signedOut" class="section hidden">
+          <label>
+            <span class="muted">Username</span>
+            <input id="username" autocomplete="username" />
+          </label>
+          <label>
+            <span class="muted">Password</span>
+            <input id="password" type="password" autocomplete="current-password" />
+          </label>
+          <div class="row">
+            <button id="signin" class="primary small">Sign in</button>
+            <button id="signup" class="small">Create account</button>
+          </div>
+        </div>
+
+        <div id="authStatus" class="status"></div>
+      </section>
+
+      <!-- Where to open the notes UI. Disabled off Spotify. -->
+      <section class="section">
+        <button id="openOverlay">Open floating window</button>
+        <button id="openPanel">Open side panel</button>
+        <div id="tabHint" class="muted hidden">Open a Spotify tab to use these.</div>
+      </section>
+
+      <section class="section">
+        <button id="openOptions" class="small">Options</button>
+      </section>
+    </main>
+
+    <script type="module" src="/src/popup.ts"></script>
+  </body>
+</html>

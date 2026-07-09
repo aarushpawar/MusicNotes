@@ -1,9 +1,19 @@
 import type { TrackMetadata } from "./models";
+import { initOverlay, toggleOverlay } from "./overlay";
 
 let lastTrackId: string | undefined;
 let debounceTimer: number | undefined;
 
-const SPOTIFY_TRACK_RE = /\/track\/([A-Za-z0-9]+)/;
+// Stable-ish id from title + artists — the now playing widget links to the
+// album, not the track, so there's no real Spotify track id to read.
+const slugify = (parts: string[]) =>
+  parts
+    .join("-")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 
 const patchHistory = () => {
   const notify = () => window.dispatchEvent(new Event("spotify-song-notes:navigation"));
@@ -24,48 +34,43 @@ const patchHistory = () => {
 
 const cleanText = (value: string | null | undefined) => value?.replace(/\s+/g, " ").trim() ?? "";
 
-const findTrackAnchor = (): HTMLAnchorElement | undefined => {
-  const anchors = [...document.querySelectorAll<HTMLAnchorElement>('a[href*="/track/"]')];
-  const footer = document.querySelector("footer");
-  const footerAnchor = footer ? [...footer.querySelectorAll<HTMLAnchorElement>('a[href*="/track/"]')][0] : undefined;
-  return footerAnchor ?? anchors.find((anchor) => SPOTIFY_TRACK_RE.test(anchor.href));
+// The currently-playing track lives in the now playing bar at the bottom left.
+// Only look there — never fall back to arbitrary page anchors (that grabs the
+// first song in a playlist instead of what's playing).
+const findNowPlayingBar = (): Element | undefined =>
+  document.querySelector('[data-testid="now-playing-widget"]') ??
+  document.querySelector('aside[aria-label="Now playing bar" i]') ??
+  document.querySelector("footer") ??
+  undefined;
+
+const extractTitle = (bar: Element): string =>
+  cleanText(bar.querySelector('[data-testid="context-item-info-title"]')?.textContent);
+
+const extractArtists = (bar: Element): string[] => {
+  const links = [...bar.querySelectorAll<HTMLAnchorElement>('[data-testid="context-item-info-artist"]')];
+  const artists = links.map((link) => cleanText(link.textContent)).filter(Boolean);
+  return [...new Set(artists)];
 };
 
-const extractArtists = (trackAnchor: HTMLAnchorElement): string[] => {
-  const container =
-    trackAnchor.closest('[data-testid="now-playing-widget"]') ??
-    trackAnchor.closest("footer") ??
-    trackAnchor.parentElement?.parentElement;
-  const artistLinks = container
-    ? [...container.querySelectorAll<HTMLAnchorElement>('a[href*="/artist/"]')]
-    : [];
-  const artists = artistLinks.map((link) => cleanText(link.textContent)).filter(Boolean);
-  if (artists.length > 0) return [...new Set(artists)];
-
-  const labelled = container?.querySelectorAll<HTMLElement>('[data-testid*="artist"], [aria-label*="artist" i]');
-  const fallback = labelled ? [...labelled].map((item) => cleanText(item.textContent)).filter(Boolean) : [];
-  return [...new Set(fallback)];
-};
-
-const extractArtwork = (trackAnchor: HTMLAnchorElement): string | undefined => {
-  const container = trackAnchor.closest('[data-testid="now-playing-widget"]') ?? trackAnchor.closest("footer");
-  const image = container?.querySelector<HTMLImageElement>("img[src]");
-  return image?.src;
-};
+const extractArtwork = (bar: Element): string | undefined =>
+  bar.querySelector<HTMLImageElement>('img[data-testid="cover-art-image"]')?.src ??
+  bar.querySelector<HTMLImageElement>("img[src]")?.src;
 
 const detectTrack = (): TrackMetadata | undefined => {
-  const anchor = findTrackAnchor();
-  if (!anchor) return undefined;
-  const match = anchor.href.match(SPOTIFY_TRACK_RE);
-  if (!match) return undefined;
-  const spotifyTrackId = match[1];
-  const title = cleanText(anchor.textContent) || anchor.getAttribute("aria-label") || "Unknown track";
+  const bar = findNowPlayingBar();
+  if (!bar) return undefined;
+  const title = extractTitle(bar);
+  const artists = extractArtists(bar);
+  if (!title) return undefined;
+
+  const spotifyTrackId = slugify([title, ...artists]);
+  const albumHref = bar.querySelector<HTMLAnchorElement>('a[href*="/album/"]')?.getAttribute("href");
   return {
     spotifyTrackId,
-    spotifyUrl: `https://open.spotify.com/track/${spotifyTrackId}`,
+    spotifyUrl: albumHref ? `https://open.spotify.com${albumHref}` : `https://open.spotify.com`,
     title,
-    artists: extractArtists(anchor),
-    artworkUrl: extractArtwork(anchor),
+    artists,
+    artworkUrl: extractArtwork(bar),
     detectedAt: Date.now()
   };
 };
@@ -87,6 +92,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ track: detectTrack() });
     return true;
   }
+  if (message?.type === "TOGGLE_OVERLAY") {
+    toggleOverlay();
+    sendResponse({ ok: true });
+    return true;
+  }
   return false;
 });
 
@@ -101,3 +111,4 @@ new MutationObserver(scheduleDetection).observe(document.body, {
 window.addEventListener("spotify-song-notes:navigation", scheduleDetection);
 window.setInterval(scheduleDetection, 5000);
 scheduleDetection();
+void initOverlay();

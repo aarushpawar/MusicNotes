@@ -1,60 +1,19 @@
-import type { PanelAction, RuntimeMessage, TrackMetadata } from "./models";
+import type { RuntimeMessage, TrackMetadata } from "./models";
 import { isSpotifyTrack } from "./models";
 import { getCurrentTrack, saveCurrentTrack } from "./storage";
+import { checkForUpdate } from "./update";
 
-const menuItems: Array<{ id: PanelAction; title: string }> = [
-  { id: "edit", title: "Edit note for current song" },
-  { id: "shared", title: "View shared notes for current song" },
-  { id: "sync", title: "Sync from followed users for current song" }
-];
+// Check for a newer GitHub release when the worker spins up and on install.
+checkForUpdate().catch(() => undefined);
+chrome.runtime.onInstalled.addListener(() => checkForUpdate(true).catch(() => undefined));
 
-let panelAction: PanelAction = "edit";
+// The popup is the single entry point (default_popup in the manifest), so there
+// is no action.onClicked handler and no context menus. This worker just keeps
+// the current track in sync for whichever surface (overlay iframe or side panel)
+// reads it via GET_PANEL_STATE.
 let inMemoryTrack: TrackMetadata | undefined;
 
-const createMenus = () => {
-  chrome.contextMenus.removeAll(() => {
-    for (const item of menuItems) {
-      chrome.contextMenus.create({
-        id: item.id,
-        title: item.title,
-        contexts: ["page"],
-        documentUrlPatterns: ["https://open.spotify.com/*"]
-      });
-    }
-  });
-};
-
-const openPanel = async (tabId: number, action: PanelAction) => {
-  panelAction = action;
-  await chrome.sidePanel.setOptions({ tabId, path: "sidepanel.html", enabled: true });
-  await chrome.sidePanel.open({ tabId });
-  const response = await chrome.tabs.sendMessage(tabId, { type: "GET_CURRENT_TRACK" }).catch(() => undefined);
-  if (isSpotifyTrack(response?.track)) {
-    inMemoryTrack = response.track;
-    await saveCurrentTrack(response.track);
-  }
-};
-
-chrome.runtime.onInstalled.addListener(createMenus);
-chrome.runtime.onStartup.addListener(createMenus);
-
-chrome.action.onClicked.addListener(async (tab) => {
-  if (tab.id) await openPanel(tab.id, "edit");
-});
-
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  const action = info.menuItemId as PanelAction;
-  if (!tab?.id || !menuItems.some((item) => item.id === action)) return;
-  await openPanel(tab.id, action);
-});
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url?.startsWith("https://open.spotify.com/")) {
-    chrome.sidePanel.setOptions({ tabId, path: "sidepanel.html", enabled: true }).catch(() => undefined);
-  }
-});
-
-chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
   if (message.type === "TRACK_CHANGED") {
     const track = isSpotifyTrack(message.track) ? message.track : undefined;
     inMemoryTrack = track;
@@ -65,14 +24,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
 
   if (message.type === "GET_PANEL_STATE") {
     getCurrentTrack()
-      .then((storedTrack) => sendResponse({ action: panelAction, track: inMemoryTrack ?? storedTrack }))
-      .catch((error: Error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (message.type === "OPEN_PANEL" && sender.tab?.id) {
-    openPanel(sender.tab.id, message.action)
-      .then(() => sendResponse({ ok: true }))
+      .then((storedTrack) => sendResponse({ action: "edit", track: inMemoryTrack ?? storedTrack }))
       .catch((error: Error) => sendResponse({ error: error.message }));
     return true;
   }
