@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Spotify Song Notes",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Plain-text notes for Spotify Web Player songs, with optional shared-note sync.",
   "action": {
     "default_title": "Spotify Song Notes",

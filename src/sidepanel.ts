@@ -74,6 +74,9 @@ const showView = (view: View) => {
   if (shared) void showSharedNotes();
   if (view === "forum") void showForum("forum");
   if (view === "mine") void showForum("mine");
+  // Returning to the editor: re-read the note so any edit just made in a forum/mine
+  // view is reflected, instead of the stale text autosave would otherwise clobber.
+  if (view === "note" && currentTrack) void loadNote();
 };
 
 const setFormEnabled = (enabled: boolean) => {
@@ -422,6 +425,15 @@ const appendForumNotes = (notes: ForumNote[]) => {
 
 let forumCursor: string | undefined;
 let forumLoading = false;
+// Monotonic guard: each showForum bumps this and captures the value; any in-flight
+// fetch whose captured id no longer matches has been superseded by a view switch and
+// must not clear/append into the current generation's list.
+let forumRequestId = 0;
+
+// Is the sentinel within (or above) the list's viewport, matching the observer's 200px
+// margin? Used to keep loading when the first page doesn't fill the viewport.
+const sentinelInView = (): boolean =>
+  forumSentinel.getBoundingClientRect().top <= forumList.getBoundingClientRect().bottom + 200;
 
 // Remove every child except the sentinel (which must persist for the observer).
 const clearForumList = () => {
@@ -438,10 +450,13 @@ const setForumEmpty = (message: string) => {
 };
 
 const showForum = async (mode: ForumMode) => {
+  const requestId = ++forumRequestId;
   forumMode = mode;
   clearForumList();
   forumCursor = undefined;
   const config = await getConfig();
+  // Superseded by a newer view switch while awaiting config: abandon silently.
+  if (requestId !== forumRequestId) return;
   myProfileId = config.profileId;
   const mine = mode === "mine";
   forumTitle.textContent = mine ? "My Notes" : "Forum";
@@ -454,6 +469,7 @@ const showForum = async (mode: ForumMode) => {
   try {
     const api = await SupabaseApi.fromStorage();
     const { notes, nextCursor } = await api.fetchForumNotes(undefined, mine ? config.profileId : undefined);
+    if (requestId !== forumRequestId) return; // view switched during the fetch
     if (notes.length === 0) {
       setForumEmpty(mine ? "You haven't written any notes yet." : "No shared notes yet.");
     } else {
@@ -462,12 +478,18 @@ const showForum = async (mode: ForumMode) => {
     forumCursor = nextCursor;
     setForumStatus("");
   } catch (error) {
+    if (requestId !== forumRequestId) return;
     setForumStatus(error instanceof Error ? error.message : "Could not load notes", "error");
+    return;
   }
+  // Page 1 didn't fill the viewport but more pages exist: keep loading.
+  if (requestId === forumRequestId && forumCursor && sentinelInView()) void loadMoreForum();
 };
 
 const loadMoreForum = async () => {
   if (forumLoading || !forumCursor) return;
+  // Capture the generation current when this load began, not a new one.
+  const requestId = forumRequestId;
   forumLoading = true;
   try {
     const config = await getConfig();
@@ -476,13 +498,19 @@ const loadMoreForum = async () => {
       forumCursor,
       forumMode === "mine" ? config.profileId : undefined
     );
+    // A newer showForum has run: don't append into or repaginate its list.
+    if (requestId !== forumRequestId) return;
     appendForumNotes(notes);
     forumCursor = nextCursor;
   } catch (error) {
+    if (requestId !== forumRequestId) return;
     setForumStatus(error instanceof Error ? error.message : "Could not load more", "error");
+    return;
   } finally {
     forumLoading = false;
   }
+  // Still more pages and the sentinel is still in view: continue the fill chain.
+  if (requestId === forumRequestId && forumCursor && sentinelInView()) void loadMoreForum();
 };
 
 // Auto-load the next page when the sentinel scrolls into the forum list's viewport.
