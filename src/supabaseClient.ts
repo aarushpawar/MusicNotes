@@ -5,6 +5,21 @@ const FORUM_PAGE_SIZE = 30;
 const SIGN_IN_REQUIRED_MESSAGE = "Sign in from Options to sync notes.";
 const SESSION_EXPIRED_MESSAGE = "Session expired. Please sign in again from Options.";
 
+export type SupabaseAuthFailureReason = "sign_in_required" | "session_expired";
+
+export class SupabaseAuthError extends Error {
+  constructor(
+    message: string,
+    readonly reason: SupabaseAuthFailureReason
+  ) {
+    super(message);
+    this.name = "SupabaseAuthError";
+  }
+}
+
+export const hasCompleteSession = (config: AppConfig): boolean =>
+  Boolean(config.username && config.profileId && config.accessToken && config.refreshToken);
+
 interface AuthResponse {
   access_token: string;
   refresh_token: string;
@@ -43,9 +58,13 @@ export class SupabaseApi {
     return new SupabaseApi(await ensureFreshToken(await getConfig()));
   }
 
+  static async forAuthentication(): Promise<SupabaseApi> {
+    return new SupabaseApi(await getConfig());
+  }
+
   private headers(authenticated = true): HeadersInit {
     if (authenticated && !this.accessToken) {
-      throw new Error(SIGN_IN_REQUIRED_MESSAGE);
+      throw new SupabaseAuthError(SIGN_IN_REQUIRED_MESSAGE, "sign_in_required");
     }
     const token = authenticated ? this.accessToken! : this.anonKey;
     return {
@@ -67,7 +86,7 @@ export class SupabaseApi {
     if (!response.ok) {
       if (authenticated && response.status === 401) {
         await clearAuth();
-        throw new Error(SESSION_EXPIRED_MESSAGE);
+        throw new SupabaseAuthError(SESSION_EXPIRED_MESSAGE, "session_expired");
       }
       const text = await response.text();
       let message = text;
@@ -288,8 +307,8 @@ export class SupabaseApi {
   }
 }
 
-// Access tokens live ~1h; the refresh token (default ~30d, sliding) buys the token back
-// silently so users who return days later stay signed in. We never store the password.
+// Access tokens live ~1h; rotating refresh tokens silently renew them according to the
+// project's session policy so returning users stay signed in. We never store the password.
 const REFRESH_SKEW_MS = 60_000; // refresh a minute early so an in-flight call can't expire
 let refreshInFlight: Promise<AppConfig> | undefined;
 
@@ -297,7 +316,7 @@ export const ensureFreshToken = async (config: AppConfig): Promise<AppConfig> =>
   if (!config.accessToken && !config.refreshToken) return config; // signed out
   if (!config.accessToken || !config.refreshToken) {
     await clearAuth();
-    throw new Error(SESSION_EXPIRED_MESSAGE);
+    throw new SupabaseAuthError(SESSION_EXPIRED_MESSAGE, "session_expired");
   }
   if (config.expiresAt && config.expiresAt - Date.now() > REFRESH_SKEW_MS) return config;
   // Dedupe: a panel load fires many API calls at once; they share one refresh.
@@ -315,7 +334,7 @@ const doRefresh = async (config: AppConfig): Promise<AppConfig> => {
   if (!response.ok) {
     // Refresh token itself is dead/revoked — clear auth so the UI prompts a fresh sign-in.
     await clearAuth();
-    throw new Error(SESSION_EXPIRED_MESSAGE);
+    throw new SupabaseAuthError(SESSION_EXPIRED_MESSAGE, "session_expired");
   }
   const body = (await response.json()) as { access_token: string; refresh_token: string; expires_in: number };
   // Keep profileId/username — the refresh endpoint doesn't return our custom profile fields.

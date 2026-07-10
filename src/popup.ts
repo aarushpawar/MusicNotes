@@ -1,4 +1,4 @@
-import { persistAuth, SupabaseApi } from "./supabaseClient";
+import { hasCompleteSession, persistAuth, SupabaseApi } from "./supabaseClient";
 import { clearAuth, getConfig } from "./storage";
 import { applyStoredTheme } from "./theme";
 import { checkForUpdate } from "./update";
@@ -27,7 +27,7 @@ const setStatus = (message: string, kind: "ok" | "error" | "" = "") => {
 
 const renderAccount = async () => {
   const config = await getConfig();
-  const loggedIn = Boolean(config.username && config.accessToken);
+  const loggedIn = hasCompleteSession(config);
   signedIn.classList.toggle("hidden", !loggedIn);
   signedOut.classList.toggle("hidden", loggedIn);
   if (loggedIn) whoami.textContent = config.username ?? "";
@@ -42,7 +42,7 @@ const authenticate = async (mode: "login" | "signup") => {
   }
   setStatus(mode === "signup" ? "Creating account…" : "Signing in…");
   try {
-    const api = await SupabaseApi.fromStorage();
+    const api = await SupabaseApi.forAuthentication();
     const auth = mode === "signup" ? await api.signup(username, password) : await api.login(username, password);
     await persistAuth(auth);
     passwordInput.value = "";

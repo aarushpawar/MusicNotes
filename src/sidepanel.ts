@@ -1,5 +1,5 @@
 import type { ForumNote, SharedNote, StoredNote, SyncUser, TrackMetadata } from "./models";
-import { SupabaseApi, syncPendingSaves } from "./supabaseClient";
+import { hasCompleteSession, SupabaseApi, SupabaseAuthError, syncPendingSaves } from "./supabaseClient";
 import { getConfig, getLocalNote, getSyncUsers, queuePendingSave, saveLocalNote } from "./storage";
 import { applyStoredTheme } from "./theme";
 import "./styles.css";
@@ -46,6 +46,15 @@ const setStatus = (message: string, kind: "ok" | "error" | "" = "") => {
 const setSharedStatus = (message: string, kind: "ok" | "error" | "" = "") => {
   sharedStatusEl.textContent = message;
   sharedStatusEl.className = `status ${kind}`.trim();
+};
+
+const authPrompt = (
+  error: unknown,
+  signedOut = "Saved locally — sign in from Options to sync.",
+  expired = "Saved locally — sign in again from Options to resume sync."
+): string | undefined => {
+  if (!(error instanceof SupabaseAuthError)) return undefined;
+  return error.reason === "session_expired" ? expired : signedOut;
 };
 
 // "forum" and "mine" both render in the #forumView section — same list, mine is scoped
@@ -160,7 +169,9 @@ const saveNote = async () => {
     setStatus("Saved", "ok");
   } catch (error) {
     await queuePendingSave(note);
-    setStatus(error instanceof Error ? `Saved offline: ${error.message}` : "Saved offline, will sync later", "error");
+    await saveLocalNote({ ...note, pending: true });
+    const prompt = authPrompt(error);
+    setStatus(prompt ?? (error instanceof Error ? `Saved offline: ${error.message}` : "Saved offline, will sync later"), prompt ? "" : "error");
   }
 };
 
@@ -196,7 +207,12 @@ const clearNote = async () => {
     setStatus("Cleared and synced", "ok");
   } catch (error) {
     await queuePendingSave(note);
-    setStatus(error instanceof Error ? `Clear queued: ${error.message}` : "Clear queued", "error");
+    const prompt = authPrompt(
+      error,
+      "Cleared locally — sign in from Options to sync.",
+      "Cleared locally — sign in again from Options to resume sync."
+    );
+    setStatus(prompt ?? (error instanceof Error ? `Clear queued: ${error.message}` : "Clear queued"), prompt ? "" : "error");
   }
 };
 
@@ -234,7 +250,12 @@ const showSharedNotes = async () => {
     renderSharedNotes(await api.fetchSharedNotes(currentTrack.spotifyTrackId));
   } catch (error) {
     sharedList.innerHTML = "";
-    setSharedStatus(error instanceof Error ? error.message : "Could not load notes", "error");
+    const prompt = authPrompt(
+      error,
+      "Sign in from Options to view shared notes.",
+      "Sign in again from Options to view shared notes."
+    );
+    setSharedStatus(prompt ?? (error instanceof Error ? error.message : "Could not load notes"), prompt ? "" : "error");
   }
 };
 
@@ -256,10 +277,17 @@ const saveForumEdit = async (note: ForumNote, body: string): Promise<void> => {
     shared: note.shared,
     updatedAt: new Date().toISOString()
   };
-  const api = await SupabaseApi.fromStorage();
-  await api.upsertNote(stored);
-  // Keep the local cache in step so the editor view shows the same text.
   await saveLocalNote(stored);
+  try {
+    const api = await SupabaseApi.fromStorage();
+    await api.upsertNote(stored);
+    await saveLocalNote({ ...stored, pending: false });
+  } catch (error) {
+    await queuePendingSave(stored);
+    await saveLocalNote({ ...stored, pending: true });
+    note.body = body;
+    throw error;
+  }
   note.body = body;
 };
 
@@ -301,6 +329,12 @@ const beginEdit = (item: HTMLElement, note: ForumNote) => {
       await saveForumEdit(note, textarea.value);
       finish(textarea.value);
     } catch (error) {
+      const prompt = authPrompt(error);
+      if (prompt) {
+        finish(textarea.value);
+        setForumStatus(prompt);
+        return;
+      }
       save.disabled = cancel.disabled = false;
       status.textContent = error instanceof Error ? error.message : "Save failed";
       status.className = "status error";
@@ -320,9 +354,17 @@ const setNoteShared = async (note: ForumNote, shared: boolean): Promise<void> =>
     shared,
     updatedAt: new Date().toISOString()
   };
-  const api = await SupabaseApi.fromStorage();
-  await api.upsertNote(stored);
   await saveLocalNote(stored);
+  try {
+    const api = await SupabaseApi.fromStorage();
+    await api.upsertNote(stored);
+    await saveLocalNote({ ...stored, pending: false });
+  } catch (error) {
+    await queuePendingSave(stored);
+    await saveLocalNote({ ...stored, pending: true });
+    note.shared = shared;
+    throw error;
+  }
   note.shared = shared;
 };
 
@@ -370,8 +412,13 @@ const renderCardActions = (item: HTMLElement, note: ForumNote) => {
       try {
         await setNoteShared(note, want);
       } catch (error) {
-        checkbox.checked = !want; // revert on failure
-        setForumStatus(error instanceof Error ? error.message : "Could not update", "error");
+        const prompt = authPrompt(error);
+        if (prompt) {
+          setForumStatus(prompt);
+        } else {
+          checkbox.checked = !want; // revert on server failure
+          setForumStatus(error instanceof Error ? error.message : "Could not update", "error");
+        }
       } finally {
         checkbox.disabled = false;
       }
@@ -390,6 +437,12 @@ const renderCardActions = (item: HTMLElement, note: ForumNote) => {
       await setNoteShared(note, false);
       item.remove(); // no longer shared → doesn't belong in the forum
     } catch (error) {
+      const prompt = authPrompt(error);
+      if (prompt) {
+        item.remove();
+        setForumStatus(prompt);
+        return;
+      }
       unshare.disabled = false;
       setForumStatus(error instanceof Error ? error.message : "Could not update", "error");
     }
@@ -460,7 +513,7 @@ const showForum = async (mode: ForumMode) => {
   const mine = mode === "mine";
   forumTitle.textContent = mine ? "My Notes" : "Forum";
   forumSubtitle.textContent = mine ? "All the notes you've written" : "Shared notes from everyone";
-  if (!config.username) {
+  if (!hasCompleteSession(config)) {
     setForumStatus(`Sign in from Options to ${mine ? "see your notes" : "browse the forum"}.`);
     return;
   }
@@ -478,7 +531,12 @@ const showForum = async (mode: ForumMode) => {
     setForumStatus("");
   } catch (error) {
     if (requestId !== forumRequestId) return;
-    setForumStatus(error instanceof Error ? error.message : "Could not load notes", "error");
+    const prompt = authPrompt(
+      error,
+      "Sign in from Options to browse notes.",
+      "Sign in again from Options to browse notes."
+    );
+    setForumStatus(prompt ?? (error instanceof Error ? error.message : "Could not load notes"), prompt ? "" : "error");
     return;
   }
   // Page 1 didn't fill the viewport but more pages exist: keep loading.
@@ -503,7 +561,12 @@ const loadMoreForum = async () => {
     forumCursor = nextCursor;
   } catch (error) {
     if (requestId !== forumRequestId) return;
-    setForumStatus(error instanceof Error ? error.message : "Could not load more", "error");
+    const prompt = authPrompt(
+      error,
+      "Sign in from Options to browse notes.",
+      "Sign in again from Options to browse notes."
+    );
+    setForumStatus(prompt ?? (error instanceof Error ? error.message : "Could not load more"), prompt ? "" : "error");
     return;
   } finally {
     forumLoading = false;
@@ -617,7 +680,12 @@ const syncFromFollowed = async () => {
     await resolveConflict(chosen);
     showView("note");
   } catch (error) {
-    setSharedStatus(error instanceof Error ? error.message : "Sync failed", "error");
+    const prompt = authPrompt(
+      error,
+      "Sign in from Options to sync shared notes.",
+      "Sign in again from Options to sync shared notes."
+    );
+    setSharedStatus(prompt ?? (error instanceof Error ? error.message : "Sync failed"), prompt ? "" : "error");
   }
 };
 
@@ -648,6 +716,6 @@ myNotesButton.addEventListener("click", () =>
 );
 
 getConfig().then((config) => {
-  if (!config.username) setStatus("Sign in from Options to sync notes.");
+  if (!hasCompleteSession(config)) setStatus("Notes save locally. Sign in from Options to sync them.");
 });
 refreshPanelState().catch((error: Error) => setStatus(error.message, "error"));

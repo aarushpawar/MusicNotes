@@ -1,5 +1,5 @@
 import type { SyncUser } from "./models";
-import { persistAuth, SupabaseApi } from "./supabaseClient";
+import { hasCompleteSession, persistAuth, SupabaseApi } from "./supabaseClient";
 import { clearAuth, getConfig, getSyncUsers, saveConfig, saveSyncUsers } from "./storage";
 import { ACCENTS, applyStoredTheme, setTheme } from "./theme";
 import type { ThemeMode } from "./models";
@@ -166,9 +166,9 @@ const loadOptions = async () => {
   supabaseUrl.value = config.supabaseUrl ?? "";
   supabaseAnonKey.value = config.supabaseAnonKey ?? "";
   usernameInput.value = config.username ?? "";
-  const loggedIn = Boolean(config.username && config.accessToken);
+  const loggedIn = hasCompleteSession(config);
   changePasswordSection.classList.toggle("hidden", !loggedIn);
-  setStatus(config.username ? `Signed in as ${config.username}` : "Not signed in", config.username ? "ok" : "");
+  setStatus(loggedIn ? `Signed in as ${config.username}` : "Not signed in", loggedIn ? "ok" : "");
   await renderSyncUsers();
   try {
     const api = await SupabaseApi.fromStorage();
@@ -194,7 +194,7 @@ saveConfigButton.addEventListener("click", async () => {
 
 loginButton.addEventListener("click", async () => {
   try {
-    const api = await SupabaseApi.fromStorage();
+    const api = await SupabaseApi.forAuthentication();
     const auth = await api.login(usernameInput.value.trim(), passwordInput.value);
     await persistAuth(auth);
     setStatus(`Signed in as ${usernameInput.value.trim()}`, "ok");
@@ -207,7 +207,7 @@ loginButton.addEventListener("click", async () => {
 
 signupButton.addEventListener("click", async () => {
   try {
-    const api = await SupabaseApi.fromStorage();
+    const api = await SupabaseApi.forAuthentication();
     const auth = await api.signup(usernameInput.value.trim(), passwordInput.value);
     await persistAuth(auth);
     setStatus(`Created ${usernameInput.value.trim()}`, "ok");
