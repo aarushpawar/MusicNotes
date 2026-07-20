@@ -1,10 +1,18 @@
+import type { Platform } from "./shared/songKey";
+
 export interface TrackMetadata {
-  spotifyTrackId: string;
-  spotifyUrl: string;
+  // Canonical cross-platform key: "sp:<spotifyTrackId>" when resolved, else "fp:<title>|<artist>".
+  songKey: string;
+  // URL to open the song — the resolved Spotify track when known, else the scraped source page.
+  sourceUrl: string;
+  platform: Platform;
   title: string;
   artists: string[];
   album?: string;
   artworkUrl?: string;
+  isrc?: string;
+  // Real Spotify track id once resolved via search (the id inside an "sp:" key).
+  spotifyTrackId?: string;
   detectedAt: number;
 }
 
@@ -63,12 +71,23 @@ export interface ForumNote {
   artworkUrl?: string;
 }
 
+// Raw scrape from a content script, before Spotify resolution. The background
+// worker resolves this into a TrackMetadata (its CSP allows the supabase fetch).
+export interface RawTrack {
+  platform: Platform;
+  title: string;
+  artists: string[];
+  sourceUrl: string;
+  artworkUrl?: string;
+}
+
 export type RuntimeMessage =
+  | { type: "RAW_TRACK"; raw?: RawTrack }
   | { type: "TRACK_CHANGED"; track?: TrackMetadata }
   | { type: "GET_PANEL_STATE" };
 
 export const isSpotifyTrack = (value: unknown): value is TrackMetadata => {
   if (!value || typeof value !== "object") return false;
   const track = value as TrackMetadata;
-  return Boolean(track.spotifyTrackId && track.spotifyUrl && track.title);
+  return Boolean(track.songKey && track.sourceUrl && track.title);
 };

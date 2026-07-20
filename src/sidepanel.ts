@@ -114,7 +114,7 @@ const renderTrack = (track?: TrackMetadata) => {
 
 const loadNote = async () => {
   if (!currentTrack) return;
-  const local = await getLocalNote(currentTrack.spotifyTrackId);
+  const local = await getLocalNote(currentTrack.songKey);
   if (local) {
     noteBodyEl.value = local.body;
     sharedToggleEl.checked = local.shared;
@@ -124,7 +124,7 @@ const loadNote = async () => {
 
   try {
     const api = await SupabaseApi.fromStorage();
-    const remote = await api.fetchMyNote(currentTrack.spotifyTrackId);
+    const remote = await api.fetchMyNote(currentTrack.songKey);
     if (remote) {
       await saveLocalNote(remote);
       noteBodyEl.value = remote.body;
@@ -145,7 +145,7 @@ const loadNote = async () => {
 const buildCurrentNote = (): StoredNote | undefined => {
   if (!currentTrack) return undefined;
   return {
-    trackId: currentTrack.spotifyTrackId,
+    trackId: currentTrack.songKey,
     body: noteBodyEl.value,
     shared: sharedToggleEl.checked,
     updatedAt: new Date().toISOString()
@@ -192,7 +192,7 @@ const clearNote = async () => {
   noteBodyEl.value = "";
   sharedToggleEl.checked = false;
   const note: StoredNote = {
-    trackId: currentTrack.spotifyTrackId,
+    trackId: currentTrack.songKey,
     body: "",
     shared: false,
     updatedAt: new Date().toISOString(),
@@ -247,7 +247,7 @@ const showSharedNotes = async () => {
   sharedList.innerHTML = '<div class="muted">Loading shared notes…</div>';
   try {
     const api = await SupabaseApi.fromStorage();
-    renderSharedNotes(await api.fetchSharedNotes(currentTrack.spotifyTrackId));
+    renderSharedNotes(await api.fetchSharedNotes(currentTrack.songKey));
   } catch (error) {
     sharedList.innerHTML = "";
     const prompt = authPrompt(
@@ -669,7 +669,7 @@ const syncFromFollowed = async () => {
   if (!currentTrack) return;
   try {
     const api = await SupabaseApi.fromStorage();
-    const [syncUsers, notes] = await Promise.all([getSyncUsers(), api.fetchSharedNotes(currentTrack.spotifyTrackId)]);
+    const [syncUsers, notes] = await Promise.all([getSyncUsers(), api.fetchSharedNotes(currentTrack.songKey)]);
     const followedIds = new Set(syncUsers.map((user) => user.id));
     const matches = notes.filter((note) => followedIds.has(note.profileId));
     const chosen = await chooseSharedNote(matches, syncUsers);
