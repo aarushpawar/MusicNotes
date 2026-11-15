@@ -1,4 +1,5 @@
 import type { AppConfig, ForumNote, SharedNote, StoredNote, SyncUser, TrackMetadata } from "../models";
+import { safeImageUrl, safeTrackUrl } from "./safeUrl";
 
 // Top match returned by the spotify-search edge function.
 export interface SpotifyMatch {
@@ -247,11 +248,11 @@ export class SupabaseApi {
         body: row.body,
         shared: row.shared,
         updatedAt: row.updated_at,
-        spotifyUrl: row.tracks!.source_url,
+        spotifyUrl: safeTrackUrl(row.tracks!.source_url),
         title: row.tracks!.title,
         artists: row.tracks!.artists,
         album: row.tracks!.album ?? undefined,
-        artworkUrl: row.tracks!.artwork_url ?? undefined
+        artworkUrl: safeImageUrl(row.tracks!.artwork_url)
       }));
     // A full page means there may be more; cursor is the last row's timestamp.
     const nextCursor = rows.length === FORUM_PAGE_SIZE ? rows[rows.length - 1].updated_at : undefined;

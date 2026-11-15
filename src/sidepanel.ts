@@ -3,6 +3,7 @@ import { hasCompleteSession, SupabaseApi, SupabaseAuthError, syncPendingSaves } 
 import { getConfig, getLocalNote, getSyncUsers, queuePendingSave, saveLocalNote } from "./storage";
 import { applyStoredTheme } from "./theme";
 import "./styles.css";
+import { safeImageUrl } from "./shared/safeUrl";
 
 applyStoredTheme();
 
@@ -108,7 +109,15 @@ const renderTrack = (track?: TrackMetadata) => {
   titleEl.textContent = track.title;
   artistsEl.textContent = track.artists.length ? track.artists.join(", ") : "Artist unknown";
   artworkEl.textContent = "";
-  artworkEl.innerHTML = track.artworkUrl ? `<img alt="" src="${track.artworkUrl}">` : "No art";
+  const art = safeImageUrl(track.artworkUrl);
+  if (art) {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = art;
+    artworkEl.append(img);
+  } else {
+    artworkEl.textContent = "No art";
+  }
   setFormEnabled(true);
 };
 
